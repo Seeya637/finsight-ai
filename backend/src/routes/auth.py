@@ -1,7 +1,7 @@
 from fastapi import APIRouter, HTTPException,Depends
 from passlib.context import CryptContext
 from jose import jwt
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta,timezone
 from src.models.user import UserSignup, UserLogin
 from src.config.database import users_collection, SECRET_KEY
 
@@ -10,8 +10,10 @@ pwd_context = CryptContext(schemes=["bcrypt"])
 
 def create_token(data: dict) -> str:
     payload = data.copy()
-    payload["exp"] = datetime.utcnow() + timedelta(days=7)
+    # UTC datetime block for Python 3.12+ configuration
+    payload["exp"] = datetime.now(timezone.utc) + timedelta(days=7)
     return jwt.encode(payload, SECRET_KEY, algorithm="HS256")
+
 
 @router.post("/signup")
 async def signup(user: UserSignup):
