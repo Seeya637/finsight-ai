@@ -14,6 +14,7 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=[
         "http://localhost:5173",
+        "https://finsight-ai-peach.vercel.app",
         "https://*.vercel.app"
     ],
     allow_credentials=True,
