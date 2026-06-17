@@ -13,8 +13,8 @@ langchain-chroma
 langchain-text-splitters
 chromadb
 pypdf
-bcrypt
 bson
 requests
 pydantic[email]
 email-validator
+bcrypt==4.0.1
