@@ -16,3 +16,5 @@ pypdf
 bcrypt
 bson
 requests
+pydantic[email]
+email-validator
