@@ -15,11 +15,27 @@ async def chat(
     request: ChatRequest,
     user = Depends(verify_token)
 ):
+    # Last 3 chats fetch karo for memory
+    cursor = chats_collection.find(
+        {"user_id": user["id"]}
+    ).sort("timestamp", -1).limit(3)
+    
+    history = []
+    async for doc in cursor:
+        history.append({
+            "question": doc["question"],
+            "answer": doc["answer"]
+        })
+    history.reverse()
+
+    # RAG call with history
     result = get_rag_response(
         request.question,
-        user["id"]
+        user["id"],
+        history
     )
 
+    # Save to MongoDB
     await chats_collection.insert_one({
         "user_id": user["id"],
         "question": request.question,
@@ -42,9 +58,15 @@ async def chat_history(user = Depends(verify_token)):
     history = []
     async for chat in cursor:
         history.append({
+            "id": str(chat["_id"]),
             "question": chat["question"],
             "answer": chat["answer"],
             "timestamp": str(chat["timestamp"])
         })
 
     return {"history": history}
+
+@router.delete("/history")
+async def clear_history(user = Depends(verify_token)):
+    await chats_collection.delete_many({"user_id": user["id"]})
+    return {"message": "Chat history cleared"}
