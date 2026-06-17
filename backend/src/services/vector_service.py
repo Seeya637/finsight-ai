@@ -1,17 +1,37 @@
 import os
+import requests
 from dotenv import load_dotenv
-from langchain_community.embeddings import HuggingFaceInferenceAPIEmbeddings
 from langchain_chroma import Chroma
+from langchain.embeddings.base import Embeddings
 import chromadb
+from typing import List
 
 load_dotenv()
 
-os.environ["TOKENIZERS_PARALLELISM"] = "false"
+# Custom embedding class — HF API directly call karo
+class HFEmbeddings(Embeddings):
+    def __init__(self):
+        self.api_key = os.getenv("HF_TOKEN")
+        self.api_url = "https://api-inference.huggingface.co/pipeline/feature-extraction/sentence-transformers/all-MiniLM-L6-v2"
+        self.headers = {"Authorization": f"Bearer {self.api_key}"}
 
-embeddings = HuggingFaceInferenceAPIEmbeddings(
-    api_key=os.getenv("HF_TOKEN"),
-    model_name="sentence-transformers/all-MiniLM-L6-v2"
-)
+    def embed_documents(self, texts: List[str]) -> List[List[float]]:
+        response = requests.post(
+            self.api_url,
+            headers=self.headers,
+            json={"inputs": texts, "options": {"wait_for_model": True}}
+        )
+        return response.json()
+
+    def embed_query(self, text: str) -> List[float]:
+        response = requests.post(
+            self.api_url,
+            headers=self.headers,
+            json={"inputs": text, "options": {"wait_for_model": True}}
+        )
+        return response.json()
+
+embeddings = HFEmbeddings()
 
 chroma_client = chromadb.PersistentClient(path="./chroma_db")
 
@@ -35,11 +55,8 @@ def search_chunks(query: str, user_id: str, top_k: int = 4) -> str:
             embedding_function=embeddings
         )
 
-        # Multiple sub-queries banao comparison ke liye
         queries = [query]
         if any(word in query.lower() for word in ['compare', 'vs', 'difference', 'both']):
-            # Query split karo
-            words = query.lower().split()
             queries = [query, query.replace('compare', '').replace('and', '').strip()]
 
         all_results = []
@@ -52,7 +69,6 @@ def search_chunks(query: str, user_id: str, top_k: int = 4) -> str:
                     all_results.append((doc, score))
                     seen_content.add(doc.page_content)
 
-        # Score se sort karo
         all_results.sort(key=lambda x: x[1])
 
         if not all_results:
@@ -80,13 +96,10 @@ def delete_document_chunks(user_id: str, filename: str):
             collection_name=collection_name,
             embedding_function=embeddings
         )
-        # Filename se chunks dhundo aur delete karo
-        results = vectorstore.get(
-            where={"source_file": filename}
-        )
+        results = vectorstore.get(where={"source_file": filename})
         if results and results['ids']:
             vectorstore.delete(ids=results['ids'])
             return len(results['ids'])
         return 0
-    except Exception as e:
+    except Exception:
         return 0
