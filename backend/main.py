@@ -10,18 +10,17 @@ app=FastAPI(
     version="1.0.0"
 )
 
-origins = [
-    "http://localhost:5173",
-    "https://finsight-ai-peach.vercel.app",    # Bina aakhri slash ke
-    "https://vercel.app"    # Aakhri slash (/) ke sath (compulsory for Chrome/Edge)
-]
-
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins,  # Wildcard "*" ko strictly hata dijiye jab allow_credentials=True ho
+    allow_origins=[
+        "http://localhost:5173",
+        "http://localhost:3000",
+        "https://finsight-ai-peach.vercel.app",   # Tumhara exact live link
+        "https://finsight-ai-peach.vercel.app/"  # Trailing slash verification ke liye
+    ],  
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allow_headers=["Content-Type", "Authorization", "Accept"],
 )
 
 
