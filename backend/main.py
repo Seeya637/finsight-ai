@@ -10,18 +10,20 @@ app=FastAPI(
     version="1.0.0"
 )
 
+origins = [
+    "http://localhost:5173",
+    "http://localhost:3000",
+    "https://finsight-ai-peach.vercel.app",   
+    "https://finsight-ai-peach.vercel.app/"  
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:5173",
-        "https://finsight-ai-peach.vercel.app",
-        "https://*.vercel.app"
-    ],
+    allow_origins=origins,  
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
 app.include_router(auth_router,prefix="/auth", tags=["Auth"])
 app.include_router(chat_router,prefix="/chat", tags=["Chat"])
 app.include_router(upload_router,prefix="/upload",tags=['Upload'])
