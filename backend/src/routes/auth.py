@@ -1,9 +1,10 @@
-from fastapi import APIRouter, HTTPException,Depends
+from fastapi import APIRouter, HTTPException, Depends
 from passlib.context import CryptContext
 from jose import jwt
-from datetime import datetime, timedelta,timezone
+from datetime import datetime, timedelta, timezone
 from src.models.user import UserSignup, UserLogin
 from src.config.database import users_collection, SECRET_KEY
+from src.middleware.auth_middleware import verify_token
 
 router = APIRouter()
 pwd_context = CryptContext(schemes=["bcrypt"])
@@ -80,7 +81,7 @@ async def login(user: UserLogin):
     }
 
 @router.get("/me")
-async def get_me(user = Depends(__import__('src.middleware.auth_middleware', fromlist=['verify_token']).verify_token)):
+async def get_me(user = Depends(verify_token)):
     return {
         "id": user["id"],
         "name": user["name"],
