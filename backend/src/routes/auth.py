@@ -1,5 +1,5 @@
+import bcrypt  # Native, bug-free hashing under modern Python
 from fastapi import APIRouter, HTTPException, Depends
-from passlib.context import CryptContext
 from jose import jwt
 from datetime import datetime, timedelta, timezone
 from src.models.user import UserSignup, UserLogin
@@ -7,16 +7,15 @@ from src.config.database import users_collection, SECRET_KEY
 from src.middleware.auth_middleware import verify_token
 
 router = APIRouter()
-pwd_context = CryptContext(schemes=["bcrypt"])
 
 def create_token(data: dict) -> str:
     payload = data.copy()
-    # UTC datetime block for Python 3.12+ configuration
     payload["exp"] = datetime.now(timezone.utc) + timedelta(days=7)
     return jwt.encode(payload, SECRET_KEY, algorithm="HS256")
 
 
 @router.post("/signup")
+@router.post("/signup/")  # Dual-mapping to permanently eliminate trailing slash issues
 async def signup(user: UserSignup):
     existing = await users_collection.find_one(
         {"email": user.email}
@@ -27,12 +26,18 @@ async def signup(user: UserSignup):
             detail="Email already registered"
         )
 
-    hashed = pwd_context.hash(user.password)
+    # Convert the string to bytes, enforce explicit truncation, and hash natively
+    password_bytes = str(user.password)[:72].encode('utf-8')
+    salt = bcrypt.gensalt()
+    hashed_password_bytes = bcrypt.hashpw(password_bytes, salt)
+    
+    # Store as a safe decoded string in MongoDB
+    hashed_password_str = hashed_password_bytes.decode('utf-8')
 
     new_user = {
         "name": user.name,
         "email": user.email,
-        "password": hashed,
+        "password": hashed_password_str,
         "documents": []
     }
     result = await users_collection.insert_one(new_user)
@@ -50,7 +55,9 @@ async def signup(user: UserSignup):
         "email": user.email
     }
 
+
 @router.post("/login")
+@router.post("/login/")  # Dual-mapping for stability
 async def login(user: UserLogin):
     existing = await users_collection.find_one(
         {"email": user.email}
@@ -61,7 +68,12 @@ async def login(user: UserLogin):
             detail="Email not found"
         )
 
-    if not pwd_context.verify(user.password, existing["password"]):
+    # Process input matching the exact same bytes conversion rules
+    input_bytes = str(user.password)[:72].encode('utf-8')
+    stored_bytes = existing["password"].encode('utf-8')
+
+    # Native secure password verification
+    if not bcrypt.checkpw(input_bytes, stored_bytes):
         raise HTTPException(
             status_code=400,
             detail="Wrong password"
@@ -79,6 +91,7 @@ async def login(user: UserLogin):
         "name": existing["name"],
         "email": existing["email"]
     }
+
 
 @router.get("/me")
 async def get_me(user = Depends(verify_token)):
